@@ -1,52 +1,75 @@
-# Serverless SaaS Backend on AWS
+# serverless-saas-aws
 
-A fully serverless REST API built with AWS Lambda, API Gateway, and DynamoDB.
-Infrastructure managed with Terraform.
-
-## Architecture
-API Gateway → Lambda → DynamoDB
+Serverless task management API on AWS. Users authenticate via Cognito and can only access their own tasks. Infrastructure managed with Terraform.
 
 ## Stack
 
-- **Runtime:** Python 3.12
-- **Compute:** AWS Lambda
-- **API:** AWS API Gateway
-- **Database:** AWS DynamoDB
+- **Compute:** AWS Lambda (Python 3.12)
+- **API:** API Gateway + Cognito authorizer
+- **Database:** DynamoDB
+- **Auth:** Cognito User Pool
 - **IaC:** Terraform
-- **Region:** us-east-1
 
 ## Endpoints
 
-| Method | Path | Handler |
-|--------|------|---------|
-| POST | /tasks | create_task |
-| GET | /tasks | get_tasks |
-| GET | /tasks/{task_id} | get_task |
-| PUT | /tasks/{task_id} | update_task |
-| DELETE | /tasks/{task_id} | delete_task |
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /tasks | Create a task |
+| GET | /tasks | Get your tasks |
+| GET | /tasks/{task_id} | Get a task by ID |
+| PUT | /tasks/{task_id} | Update a task |
+| DELETE | /tasks/{task_id} | Delete a task |
+
+All endpoints require a valid Cognito JWT token in the `Authorization` header.
+
+## Deploy
+
+```bash
+cd infrastructure
+terraform init && terraform apply
+```
+
+## Authentication
+
+```bash
+# Register
+aws cognito-idp sign-up \
+  --client-id $CLIENT_ID \
+  --username you@example.com \
+  --password YourPassword1! \
+  --user-attributes Name=email,Value=you@example.com
+
+# Login
+aws cognito-idp initiate-auth \
+  --client-id $CLIENT_ID \
+  --auth-flow USER_PASSWORD_AUTH \
+  --auth-parameters USERNAME=you@example.com,PASSWORD=YourPassword1!
+
+# Use the IdToken from the response
+curl -H "Authorization: $ID_TOKEN" $API_URL/tasks
+```
 
 ## Usage
 
 ```bash
-# Deploy
-cd infrastructure
-terraform init && terraform apply
-
 # Create task
 curl -X POST $API_URL/tasks \
+  -H "Authorization: $ID_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title": "task title", "description": "task description"}'
 
 # Get all tasks
-curl $API_URL/tasks
+curl -H "Authorization: $ID_TOKEN" $API_URL/tasks
 
 # Update task
 curl -X PUT $API_URL/tasks/{task_id} \
+  -H "Authorization: $ID_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 
 # Delete task
-curl -X DELETE $API_URL/tasks/{task_id}
+curl -X DELETE $API_URL/tasks/{task_id} \
+  -H "Authorization: $ID_TOKEN"
 ```
 
 ## Requirements
